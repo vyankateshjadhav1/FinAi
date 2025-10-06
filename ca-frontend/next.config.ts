@@ -1,18 +1,24 @@
 import type { NextConfig } from "next";
 
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 const nextConfig: NextConfig = {
   async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: process.env.NODE_ENV === 'production' 
-          ? '/api/:path*'  // In production, API calls go to Vercel functions
-          : 'http://localhost:8000/:path*', // In development, proxy to local FastAPI
-      },
-    ];
+    return isDevelopment 
+      ? [
+          {
+            source: '/api/:path*',
+            destination: 'http://localhost:8000/:path*', // Proxy to local FastAPI in dev
+          },
+        ]
+      : []; // In production, API calls go directly to /api/* (Vercel functions)
   },
   env: {
-    CUSTOM_KEY: process.env.NODE_ENV,
+    CUSTOM_KEY: process.env.NODE_ENV || 'development',
+  },
+  // Configure for Vercel deployment
+  experimental: {
+    outputFileTracingRoot: '../',
   },
 };
 

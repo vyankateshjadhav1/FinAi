@@ -1,0 +1,13 @@
+{
+  "name": "finai-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "cd ca-frontend && npm run dev",
+    "build": "cd ca-frontend && npm run build",
+    "start": "cd ca-frontend && npm run start"
+  },
+  "workspaces": [
+    "ca-frontend"
+  ]
+}
