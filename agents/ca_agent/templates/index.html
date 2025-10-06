@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CA Agent - Document Analysis</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>CA Agent Document Upload</h1>
+        
+        <!-- Upload Mode Selection -->
+        <div class="upload-mode-selection">
+            <h3>Choose Upload Mode:</h3>
+            <div class="mode-buttons">
+                <button id="regularModeBtn" class="mode-btn active" onclick="switchMode('regular')">
+                    <div class="mode-icon">📄</div>
+                    <div class="mode-text">Regular Upload</div>
+                    <div class="mode-desc">Standard document processing</div>
+                </button>
+                <button id="secureModeBtn" class="mode-btn" onclick="switchMode('secure')">
+                    <div class="mode-icon">🔒</div>
+                    <div class="mode-text">Secure Upload</div>
+                    <div class="mode-desc">Encrypt and protect your data</div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Regular Upload Form -->
+        <form id="uploadForm" class="upload-form">
+            <div class="form-header">
+                <h3>📄 Regular Document Upload</h3>
+                <p>Your documents will be processed directly without encryption</p>
+            </div>
+            <label for="client_type">Client Type:</label>
+            <select id="client_type" name="client_type" required>
+                <option value="salaried">Salaried</option>
+                <option value="self_employed">Self Employed</option>
+                <option value="business">Business</option>
+            </select>
+            <br><br>
+            <label>Upload PDF Documents:</label>
+            <input type="file" id="files" name="files" multiple required accept=".pdf">
+            <br><br>
+            <button type="submit">Analyze Documents</button>
+        </form>
+
+        <!-- Secure Upload Form -->
+        <form id="secureUploadForm" class="upload-form" style="display:none;">
+            <div class="form-header secure">
+                <h3>🔒 Secure Document Upload</h3>
+                <p>Your documents will be encrypted and stored securely</p>
+            </div>
+            <label for="secure_client_type">Client Type:</label>
+            <select id="secure_client_type" name="client_type" required>
+                <option value="salaried">Salaried</option>
+                <option value="self_employed">Self Employed</option>
+                <option value="business">Business</option>
+            </select>
+            <br><br>
+            <label>Upload PDF Documents:</label>
+            <input type="file" id="secure_files" name="files" multiple required accept=".pdf">
+            <br><br>
+            <button type="submit" class="protect-btn">🔒 Protect My Data (Encrypt)</button>
+        </form>
+
+        <!-- Access Grant Section -->
+        <div id="accessGrantSection" class="access-section" style="display:none;">
+            <div class="access-header">
+                <h3>🔐 Grant Access to Encrypted Documents</h3>
+                <p>Your documents have been encrypted and uploaded securely. Click below to grant access for processing.</p>
+            </div>
+            <div class="session-info">
+                <p><strong>Session ID:</strong> <span id="sessionId"></span></p>
+                <p><strong>Files Encrypted:</strong> <span id="filesCount"></span></p>
+                <p><strong>Expires:</strong> <span id="expiresAt"></span></p>
+            </div>
+            <form id="grantAccessForm">
+                <input type="hidden" id="upload_session_id" name="upload_session_id">
+                <input type="hidden" id="access_token" name="access_token">
+                <input type="hidden" id="processing_client_type" name="client_type">
+                <button type="submit" class="grant-access-btn">🔓 Grant Access & Process Documents</button>
+            </form>
+        </div>
+
+        <h2>Analysis Results:</h2>
+        <div id="response-container" style="display:none;">
+            <div class="result-header">
+                <h3 id="task-name"></h3>
+                <div class="view-toggle">
+                    <button id="formatted-view" class="active">Formatted View</button>
+                    <button id="markdown-view">Markdown View</button>
+                </div>
+            </div>
+            <div id="response" class="response-content"></div>
+            <div id="markdown-content" class="markdown-content" style="display:none;"></div>
+            <div id="file-info" class="file-info"></div>
+        </div>
+        <div id="loading" style="display:none;" class="loading">
+            <p>🔍 Analyzing your documents... This may take a few moments.</p>
+        </div>
+        <div id="error" style="display:none;" class="error-message"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const secureForm = document.getElementById('secureUploadForm');
+        const grantAccessForm = document.getElementById('grantAccessForm');
+        const responseEl = document.getElementById('response');
+        
+        let currentMode = 'regular';
+        let encryptionData = null;
+
+        // Mode switching functionality
+        function switchMode(mode) {
+            currentMode = mode;
+            const regularBtn = document.getElementById('regularModeBtn');
+            const secureBtn = document.getElementById('secureModeBtn');
+            const regularForm = document.getElementById('uploadForm');
+            const secureForm = document.getElementById('secureUploadForm');
+            const accessSection = document.getElementById('accessGrantSection');
+
+            if (mode === 'regular') {
+                regularBtn.classList.add('active');
+                secureBtn.classList.remove('active');
+                regularForm.style.display = 'block';
+                secureForm.style.display = 'none';
+                accessSection.style.display = 'none';
+            } else {
+                secureBtn.classList.add('active');
+                regularBtn.classList.remove('active');
+                regularForm.style.display = 'none';
+                secureForm.style.display = 'block';
+                accessSection.style.display = 'none';
+            }
+            
+            // Hide any previous results
+            document.getElementById('response-container').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+        }
+
+        function formatFinancialReport(text) {
+            // Clean up escape characters first
+            text = text.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+            
+            // Convert to HTML with enhanced formatting
+            let formatted = text
+                // Main title formatting
+                .replace(/(FINANCIAL ANALYSIS REPORT[^\n]*)/gi, '<div class="main-title">$1</div>')
+                
+                // Section headers with ### or ##
+                .replace(/#{2,4}\s*(\d+\.\s*[A-Z\s&]+[^\n]*)/g, '<div class="section-header">$1</div>')
+                
+                // Regular section headers with numbers (1., 2., etc.)
+                .replace(/^(\d+\.\s+[A-Z\s&]+[A-Z\s]*[^\n]*)/gm, '<div class="section-header">$1</div>')
+                
+                // Subsection headers (starting with -)
+                .replace(/^-\s+([^:\n]+):/gm, '<div class="subsection-header">$1:</div>')
+                
+                // Financial amounts - enhanced to catch more patterns
+                .replace(/(₹\s*[\d,]+\.?\d*|Rs\.?\s*[\d,]+\.?\d*|\$[\d,]+\.?\d*)/g, '<span class="amount">$1</span>')
+                
+                // Percentages - enhanced
+                .replace(/(\d+\.?\d*\s*%|≈\s*\d+\.?\d*\s*%)/g, '<span class="percentage">$1</span>')
+                
+                // Bold important terms - expanded list
+                .replace(/\b(TDS|PF|HRA|LTA|Section 80C|Section\s*80C|Taxable Income|Total Income|Effective|Tax|Deduction|Refund|ELSS|PPF|Special Allowance|Conveyance|FY\s*\d{4}-\d{2})\b/gi, '<span class="highlight-term">$1</span>')
+                
+                // Insight items with table-like structure
+                .replace(/^\|\s*([^|]+)\s*\|\s*([^|]*)\s*\|/gm, '<div class="insight-item"><strong>$1</strong> $2</div>')
+                
+                // Simple bullet points
+                .replace(/^-\s+([^\n]+)/gm, '<div class="insight-item">• $1</div>')
+                
+                // Convert line breaks to proper spacing
+                .replace(/\n\n+/g, '</div><div class="content-section">')
+                .replace(/\n/g, '<br>')
+                
+                // Separator lines
+                .replace(/={3,}/g, '<hr class="section-divider">')
+                .replace(/---+/g, '<hr class="subsection-divider">');
+            
+            // Wrap in content sections
+            formatted = '<div class="content-section">' + formatted + '</div>';
+            
+            return formatted;
+        }
+
+        // Regular form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const files = document.getElementById('files').files;
+            const clientType = document.getElementById('client_type').value;
+
+            const formData = new FormData();
+            formData.append("client_type", clientType);
+            for (let i = 0; i < files.length; i++) {
+                formData.append("files", files[i]);
+            }
+
+            // Show loading state
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('response-container').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+
+            try {
+                const res = await fetch("/ca/analyze", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await res.json();
+                
+                // Hide loading
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.error) {
+                    // Show error
+                    document.getElementById('error').style.display = 'block';
+                    document.getElementById('error').innerHTML = `<h3>Error:</h3><p>${data.error}</p>`;
+                } else {
+                    // Show results
+                    document.getElementById('response-container').style.display = 'block';
+                    document.getElementById('task-name').textContent = `Task: ${data.task}`;
+                    
+                    // Format the result text with enhanced styling
+                    let formattedResult = data.result;
+                    if (typeof formattedResult === 'string') {
+                        formattedResult = formatFinancialReport(formattedResult);
+                    }
+                    
+                    // Set both formatted and markdown content
+                    document.getElementById('response').innerHTML = formattedResult;
+                    document.getElementById('markdown-content').innerHTML = `<pre>${data.markdown || data.result}</pre>`;
+                    
+                    // Show file save info
+                    if (data.file_saved) {
+                        document.getElementById('file-info').innerHTML = `<p><strong>✅ Report saved to:</strong> ${data.file_saved}</p>`;
+                    }
+                    
+                    // Setup view toggle functionality
+                    setupViewToggle();
+                }
+            } catch (err) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').innerHTML = `<h3>Error:</h3><p>${err.message}</p>`;
+            }
+        });
+
+        // Secure form submission (encryption)
+        secureForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const files = document.getElementById('secure_files').files;
+            const clientType = document.getElementById('secure_client_type').value;
+
+            const formData = new FormData();
+            formData.append("client_type", clientType);
+            for (let i = 0; i < files.length; i++) {
+                formData.append("files", files[i]);
+            }
+
+            // Show loading state
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').innerHTML = '<p>🔒 Encrypting and uploading your documents securely...</p>';
+            document.getElementById('response-container').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+
+            try {
+                const res = await fetch("/api/secure-upload", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await res.json();
+                
+                // Hide loading
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.status === 'error') {
+                    // Show error
+                    document.getElementById('error').style.display = 'block';
+                    document.getElementById('error').innerHTML = `<h3>Encryption Error:</h3><p>${data.message}</p>`;
+                } else {
+                    // Store encryption data
+                    encryptionData = {
+                        upload_session_id: data.upload_session_id,
+                        access_token: data.access_token,
+                        client_type: clientType
+                    };
+                    
+                    // Show access grant section
+                    document.getElementById('accessGrantSection').style.display = 'block';
+                    document.getElementById('sessionId').textContent = data.upload_session_id;
+                    document.getElementById('filesCount').textContent = data.files.length;
+                    document.getElementById('expiresAt').textContent = new Date(data.expires_at).toLocaleString();
+                    
+                    // Set hidden form values
+                    document.getElementById('upload_session_id').value = data.upload_session_id;
+                    document.getElementById('access_token').value = data.access_token;
+                    document.getElementById('processing_client_type').value = clientType;
+                    
+                    // Hide the secure upload form
+                    document.getElementById('secureUploadForm').style.display = 'none';
+                }
+            } catch (err) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').innerHTML = `<h3>Encryption Error:</h3><p>${err.message}</p>`;
+            }
+        });
+
+        // Grant access form submission (decryption and processing)
+        grantAccessForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            formData.append("upload_session_id", document.getElementById('upload_session_id').value);
+            formData.append("access_token", document.getElementById('access_token').value);
+
+            // Show loading state
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').innerHTML = '<p>🔓 Granting access and processing encrypted documents...</p>';
+            document.getElementById('error').style.display = 'none';
+
+            try {
+                // First grant access
+                const accessRes = await fetch("/api/grant-access", {
+                    method: "POST",
+                    body: formData
+                });
+                const accessData = await accessRes.json();
+                
+                if (accessData.status === 'error') {
+                    throw new Error(accessData.message);
+                }
+
+                // Now process the documents
+                const processFormData = new FormData();
+                processFormData.append("upload_session_id", document.getElementById('upload_session_id').value);
+                processFormData.append("processing_key", accessData.processing_key);
+                processFormData.append("client_type", document.getElementById('processing_client_type').value);
+
+                const processRes = await fetch("/api/process-encrypted-documents", {
+                    method: "POST",
+                    body: processFormData
+                });
+                const processData = await processRes.json();
+                
+                // Hide loading
+                document.getElementById('loading').style.display = 'none';
+                
+                if (processData.status === 'error') {
+                    // Show error
+                    document.getElementById('error').style.display = 'block';
+                    document.getElementById('error').innerHTML = `<h3>Processing Error:</h3><p>${processData.message}</p>`;
+                } else {
+                    // Show results
+                    document.getElementById('response-container').style.display = 'block';
+                    document.getElementById('task-name').textContent = `Task: ${processData.task}`;
+                    
+                    // Format the result text with enhanced styling
+                    let formattedResult = processData.result;
+                    if (typeof formattedResult === 'string') {
+                        formattedResult = formatFinancialReport(formattedResult);
+                    }
+                    
+                    // Set both formatted and markdown content
+                    document.getElementById('response').innerHTML = formattedResult;
+                    document.getElementById('markdown-content').innerHTML = `<pre>${processData.result}</pre>`;
+                    
+                    // Show processing info with cleanup details
+                    let cleanupInfo = '';
+                    if (processData.s3_cleanup && processData.s3_cleanup.length > 0) {
+                        cleanupInfo = '<div class="cleanup-details"><h4>🗑️ S3 Cleanup:</h4><ul>';
+                        processData.s3_cleanup.forEach(status => {
+                            cleanupInfo += `<li>${status}</li>`;
+                        });
+                        cleanupInfo += '</ul></div>';
+                    }
+                    
+                    document.getElementById('file-info').innerHTML = `
+                        <p><strong>✅ Secure Processing Complete:</strong></p>
+                        <p>Files processed: ${processData.processed_files}</p>
+                        <p>Session cleaned: ${processData.session_cleaned ? 'Yes' : 'No'}</p>
+                        <p>Temporary files cleaned: ${processData.temp_files_cleaned || 0}</p>
+                        ${processData.file_saved ? `<p><strong>📄 Report saved to:</strong> ${processData.file_saved}</p>` : ''}
+                        ${cleanupInfo}
+                    `;
+                    
+                    // Hide access grant section
+                    document.getElementById('accessGrantSection').style.display = 'none';
+                    
+                    // Setup view toggle functionality
+                    setupViewToggle();
+                }
+            } catch (err) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').innerHTML = `<h3>Access Grant Error:</h3><p>${err.message}</p>`;
+            }
+        });
+
+        function setupViewToggle() {
+            const formattedBtn = document.getElementById('formatted-view');
+            const markdownBtn = document.getElementById('markdown-view');
+            const responseDiv = document.getElementById('response');
+            const markdownDiv = document.getElementById('markdown-content');
+
+            formattedBtn.addEventListener('click', () => {
+                formattedBtn.classList.add('active');
+                markdownBtn.classList.remove('active');
+                responseDiv.style.display = 'block';
+                markdownDiv.style.display = 'none';
+            });
+
+            markdownBtn.addEventListener('click', () => {
+                markdownBtn.classList.add('active');
+                formattedBtn.classList.remove('active');
+                responseDiv.style.display = 'none';
+                markdownDiv.style.display = 'block';
+            });
+        }
+    </script>
+</body>
+</html>
